@@ -1,3 +1,4 @@
 /ebin/
 /.settings
 /.project
+/src/*.beam
