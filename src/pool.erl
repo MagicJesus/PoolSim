@@ -32,9 +32,9 @@ message({invalid_args, FunctionName}) ->
 % -- handle_call/3 to callback do gen_server:call
 handle_call({swim, Time}, _From, State) ->
 	PIDs = lane_processes(State),
-	Lane = check_for_first_free_lane(PIDs),
-	%[PID ! {self(), {swim, Time}} || PID <- PIDs ],
-	{reply, {PIDs, Lane}, State}.
+	[Lane|_] = check_for_first_free_lane(PIDs),
+	Lane ! {self(), {swim, Time}},
+	{reply, {ok}, State}.
 	
 handle_cast(_Request, State) -> {noreply, State}.
 
@@ -48,12 +48,24 @@ lane_processes(State) ->
     maps:get(lane_pids, State, []).
 
 check_for_first_free_lane(PIDs) ->
-	Response = [PID ! {self(), {request, available}} || PID <- PIDs],
+	[PID ! {self(), {request, available}} || PID <- PIDs], % wyslanie prosby o informacje o dostepnosci toru	
+	Response = collect(PIDs),
 	% ta funkcja bedzie zwracac id pierwszego wolnego napotkanego toru
 	case length(Response) =:= 0 of
         true -> Response;
         false ->
             Response
+    end.
+
+% funkcja collect służy do odbierania komunikatów od torów
+collect([]) -> [];
+collect(PIDs) ->
+    receive
+        {PID, {avialable, _}} ->
+            [ PID | collect(PIDs -- [PID])];
+        {PID, Response } ->
+            [ Response | collect(PIDs -- [PID])];
+        _ -> c:flush(), [] % Fail quietly and flush message queue.
     end.
 	
 	

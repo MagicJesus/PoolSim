@@ -15,20 +15,20 @@ loop() ->
 	receive
 		{Sender, {request, available}} ->
 			Cap = get(capacity),
-			io:format("Capacity while requesting: ~w\n", [Cap]),
+			% io:format("Capacity while requesting: ~w\n", [Cap]),
 			case Cap =:= 0 of
 				true -> 
-					Sender ! noop;
+					Sender ! {self(), unavialable};
 				false ->
-					Sender ! {self(), Cap}
+					Sender ! {self(), {avialable, Cap}}
 			end;
 		{Sender, {swim, Time}} ->
-			spawn(?MODULE, swimmer, [self(), Time]),
+			spawn(?MODULE, swimmer, [self(), Time, get(id)]),
 			NewCap = get(capacity) - 1,
 			put(capacity, NewCap),
 			Sender ! {get(id), {swimmer_entered}};
 		{_ , {swimmer, finished}} ->
-			io:format("Swimmer finished... lane ID: ~w, capacity before leaving: ~w\n", [get(id), get(capacity)]),
+			io:format("Swimmer finished swimming on lane ID: ~w\n", [get(id)]),
 			NewCap = get(capacity) + 1,
 			put(capacity, NewCap);
 		{Sender, _} ->
@@ -36,6 +36,6 @@ loop() ->
 	end,
 	loop().
 
-swimmer(Parent, Time) ->
-	io:format("Swimmer entering...\n"),
+swimmer(Parent, Time, ID) ->
+	io:format("Swimmer entering lane ~w\n", [ID]),
 	timer:send_after(Time, Parent, {self(), {swimmer, finished}}).
