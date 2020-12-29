@@ -13,8 +13,8 @@ swim(Time) when is_integer(Time) ->
 % -- funkcja start() odpala serwer i tworzy odpowiednia ilosc torów
 start() ->
 	start({?DefaultSwimmingLanes, ?DefaultCapacity}).
-start({NumOfLanes, Capacity}) when is_integer(NumOfLanes) 
-							  andalso is_integer(Capacity) ->
+start({NumOfLanes, Capacity}) 	when is_integer(NumOfLanes)
+								andalso is_integer(Capacity) ->
 	Number = max(NumOfLanes, 1),
 	gen_server:start_link({local, ?MODULE}, ?MODULE, [Number, Capacity], []);
 start(_) ->
@@ -32,8 +32,9 @@ message({invalid_args, FunctionName}) ->
 % -- handle_call/3 to callback do gen_server:call
 handle_call({swim, Time}, _From, State) ->
 	PIDs = lane_processes(State),
-	[PID ! {self(), id} || PID <- PIDs ],
-	{reply, PIDs, State}.
+	Lane = check_for_first_free_lane(PIDs),
+	%[PID ! {self(), {swim, Time}} || PID <- PIDs ],
+	{reply, {PIDs, Lane}, State}.
 	
 handle_cast(_Request, State) -> {noreply, State}.
 
@@ -45,5 +46,15 @@ code_change(_OldVsn, State, _Extra) -> {ok, State}.
 
 lane_processes(State) ->
     maps:get(lane_pids, State, []).
+
+check_for_first_free_lane(PIDs) ->
+	Response = [PID ! {self(), {request, available}} || PID <- PIDs],
+	% ta funkcja bedzie zwracac id pierwszego wolnego napotkanego toru
+	case length(Response) =:= 0 of
+        true -> Response;
+        false ->
+            Response
+    end.
+	
 	
 	
