@@ -18,7 +18,7 @@ loop() ->
 			% io:format("Capacity while requesting: ~w\n", [Cap]),
 			case Cap =:= 0 of
 				true -> 
-					Sender ! {self(), unavialable};
+					Sender ! {self(), 0};
 				false ->
 					Sender ! {self(), {avialable, Cap}}
 			end;
