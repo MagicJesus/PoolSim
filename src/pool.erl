@@ -8,7 +8,12 @@
 
 % -- funkcja do 'wchodzenia do basenu'
 swim(Time) when is_integer(Time) -> 
-	gen_server:call(?MODULE, {swim, Time}). % gen_server:call wywołuje moja metode handle_call/3
+	gen_server:call(?MODULE, {swim, Time}); % gen_server:call wywołuje moja metode handle_call/3
+swim(_) ->
+	message({invalid_args, "swim()"}).
+% -- funkcja do sprawdzania aktualnego stanu torów
+status() ->
+	gen_server:call(?MODULE, {check_status}).
 
 % -- funkcja start() odpala serwer i tworzy odpowiednia ilosc torów
 start() ->
@@ -40,7 +45,12 @@ handle_call({swim, Time}, _From, State) ->
 		false ->
 			Lane ! {self(), {swim, Time}},
 			{reply, {ok, Lane}, State}
-	end.
+	end;
+handle_call({check_status}, _From, State) ->
+	PIDs = lane_processes(State),
+	[PID ! {self(), {request, state}} || PID <- PIDs],
+	Response = collect(PIDs),
+	{reply, {ok, Response}, State}.
 	
 handle_cast(_Request, State) -> 
 	{noreply, State}.
@@ -73,7 +83,9 @@ check_for_first_free_lane(PIDs) ->
 collect([]) -> [];
 collect(PIDs) ->
     receive
-        {PID, {avialable, _}} ->
+		{PID, {status, Ident, Actual}} ->
+			[ {Ident, Actual} | collect(PIDs -- [PID])];
+		{PID, {avialable, _}} ->
             [ PID | collect(PIDs -- [PID])];
         {PID, Response } ->
             [ Response | collect(PIDs -- [PID])];

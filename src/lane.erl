@@ -15,13 +15,16 @@ loop() ->
 	receive
 		{Sender, {request, available}} ->
 			Cap = get(capacity),
-			% io:format("Capacity while requesting: ~w\n", [Cap]),
 			case Cap =:= 0 of
 				true -> 
 					Sender ! {self(), 0};
 				false ->
 					Sender ! {self(), {avialable, Cap}}
 			end;
+		{Sender, {request, state}} ->
+			Actual = get(capacity),
+			Ident = get(id),
+			Sender ! {self(), {status, Ident, Actual}};
 		{Sender, {swim, Time}} ->
 			spawn(?MODULE, swimmer, [self(), Time, get(id)]),
 			NewCap = get(capacity) - 1,
