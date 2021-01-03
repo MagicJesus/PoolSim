@@ -8,7 +8,12 @@
 
 % -- funkcja do 'wchodzenia do basenu'
 swim(Time) when is_integer(Time) -> 
-	gen_server:call(?MODULE, {swim, Time}). % gen_server:call wywołuje moja metode handle_call/3
+	gen_server:call(?MODULE, {swim, Time}); % gen_server:call wywołuje moja metode handle_call/3
+swim(_) ->
+	message({invalid_args, "swim()"}).
+% -- funkcja do sprawdzania aktualnego stanu torów
+status() ->
+	gen_server:call(?MODULE, {check_status}).
 
 % -- funkcja start() odpala serwer i tworzy odpowiednia ilosc torów
 start() ->
@@ -32,17 +37,32 @@ message({invalid_args, FunctionName}) ->
 % -- handle_call/3 to callback do gen_server:call
 handle_call({swim, Time}, _From, State) ->
 	PIDs = lane_processes(State),
-	[Lane|_] = check_for_first_free_lane(PIDs),
-	Lane ! {self(), {swim, Time}},
-	{reply, {ok}, State}.
+	Lane = check_for_first_free_lane(PIDs),
+	case Lane =:= 0 of
+		true ->
+			io:format("No free lanes"),
+			{reply, {all_lanes_taken}, State};
+		false ->
+			Lane ! {self(), {swim, Time}},
+			{reply, {ok, Lane}, State}
+	end;
+handle_call({check_status}, _From, State) ->
+	PIDs = lane_processes(State),
+	[PID ! {self(), {request, state}} || PID <- PIDs],
+	Response = collect(PIDs),
+	{reply, {ok, Response}, State}.
 	
-handle_cast(_Request, State) -> {noreply, State}.
+handle_cast(_Request, State) -> 
+	{noreply, State}.
 
-handle_info(_Request, State) -> {noreply, State}.
+handle_info(_Request, State) -> 
+	{noreply, State}.
 
-terminate(_Reason, _State) -> ok.
+terminate(_Reason, _State) -> 
+	ok.
 
-code_change(_OldVsn, State, _Extra) -> {ok, State}.
+code_change(_OldVsn, State, _Extra) -> 
+	{ok, State}.
 
 lane_processes(State) ->
     maps:get(lane_pids, State, []).
@@ -50,23 +70,31 @@ lane_processes(State) ->
 check_for_first_free_lane(PIDs) ->
 	[PID ! {self(), {request, available}} || PID <- PIDs], % wyslanie prosby o informacje o dostepnosci toru	
 	Response = collect(PIDs),
+	Filtered = lists:filter(fun(X) -> not_zero(X) end, Response),
 	% ta funkcja bedzie zwracac id pierwszego wolnego napotkanego toru
-	case length(Response) =:= 0 of
-        true -> Response;
+	case length(Filtered) =:= 0 of
+        true -> 0;
         false ->
-            Response
+            [H|_] = Filtered,
+			  H
     end.
 
 % funkcja collect służy do odbierania komunikatów od torów
 collect([]) -> [];
 collect(PIDs) ->
     receive
-        {PID, {avialable, _}} ->
-            [ PID | collect(PIDs -- [PID])];
-        {PID, Response } ->
-            [ Response | collect(PIDs -- [PID])];
-        _ -> c:flush(), [] % Fail quietly and flush message queue.
+		{PID, {status, Ident, Actual}} ->
+			[ {Ident, Actual} | collect(PIDs -- [PID])];
+		{PID, {avialable, _}} ->
+      [ PID | collect(PIDs -- [PID])];
+    {PID, Response } ->
+      [ Response | collect(PIDs -- [PID])];
+    _ -> c:flush(), [] % Fail quietly and flush message queue.
     end.
-	
-	
-	
+not_zero(X) ->
+	case X =:= 0 of
+		true ->
+			false;
+		false ->
+			true
+	end.
