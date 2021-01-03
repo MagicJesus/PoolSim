@@ -76,7 +76,7 @@ check_for_first_free_lane(PIDs) ->
         true -> 0;
         false ->
             [H|_] = Filtered,
-			H
+			  H
     end.
 
 % funkcja collect służy do odbierania komunikatów od torów
@@ -86,12 +86,11 @@ collect(PIDs) ->
 		{PID, {status, Ident, Actual}} ->
 			[ {Ident, Actual} | collect(PIDs -- [PID])];
 		{PID, {avialable, _}} ->
-            [ PID | collect(PIDs -- [PID])];
-        {PID, Response } ->
-            [ Response | collect(PIDs -- [PID])];
-        _ -> c:flush(), [] % Fail quietly and flush message queue.
+      [ PID | collect(PIDs -- [PID])];
+    {PID, Response } ->
+      [ Response | collect(PIDs -- [PID])];
+    _ -> c:flush(), [] % Fail quietly and flush message queue.
     end.
-
 not_zero(X) ->
 	case X =:= 0 of
 		true ->
